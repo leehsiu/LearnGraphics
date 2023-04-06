@@ -13,7 +13,6 @@ def init_glfw(width, height, title="window"):
     glfw.window_hint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3)
     glfw.window_hint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE)
     glfw.window_hint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE)
-    glfw.window_hint(GLFW.GLFW_DOUBLEBUFFER, gl.GL_FALSE)
     window = glfw.create_window(width, height, title, None, None)
     glfw.make_context_current(window)
     glfw.set_framebuffer_size_callback(window, framebuffer_size_callback)
@@ -28,11 +27,22 @@ def framebuffer_size_callback(window, width, height):
 
 class Shaders:
     def __init__(self, vertex_shader, fragment_shader):
-        v_shader = glshaders.compileShader(vertex_shader, gl.GL_VERTEX_SHADER)
-        f_shader = glshaders.compileShader(
-            fragment_shader, gl.GL_FRAGMENT_SHADER)
-        self.shader = glshaders.compileProgram(
-            v_shader, f_shader)
+        vertex = gl.glCreateShader(gl.GL_VERTEX_SHADER)
+        gl.glShaderSource(vertex, vertex_shader)
+        gl.glCompileShader(vertex)
+        
+        fragment = gl.glCreateShader(gl.GL_FRAGMENT_SHADER)
+        gl.glShaderSource(fragment, fragment_shader)
+        gl.glCompileShader(fragment)
+        
+        self.shader = gl.glCreateProgram()
+        gl.glAttachShader(self.shader, vertex)
+        gl.glAttachShader(self.shader, fragment)
+        gl.glLinkProgram(self.shader)
+        
+        gl.glDeleteShader(vertex)
+        gl.glDeleteShader(fragment)
+        
 
     @classmethod
     def load(cls, vertex_path, fragment_path):

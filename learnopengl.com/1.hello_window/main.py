@@ -8,16 +8,18 @@ import OpenGL.GL as gl
 
 def init_glfw(width, height, title="window"):
     glfw.init()
+    
+    # Follow are required on macOS to use OpenGL 4.1 
     glfw.window_hint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3)
     glfw.window_hint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3)
     glfw.window_hint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE)
     glfw.window_hint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE)
-    glfw.window_hint(GLFW.GLFW_DOUBLEBUFFER, gl.GL_FALSE)
+    # glfw.window_hint(GLFW.GLFW_DOUBLEBUFFER, gl.GL_FALSE)
     window = glfw.create_window(width, height, title, None, None)
     glfw.make_context_current(window)
     glfw.set_framebuffer_size_callback(window, framebuffer_size_callback)
     gl.glEnable(gl.GL_PROGRAM_POINT_SIZE)
-
+    print(gl.glGetString(gl.GL_VERSION))
     return window
 
 
