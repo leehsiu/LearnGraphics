@@ -1,3 +1,5 @@
 pyopengl
 glfw
 numpy
+pillow
+scipy

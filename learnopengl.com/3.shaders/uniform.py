@@ -72,7 +72,6 @@ class Triangles:
             gl.GL_TRIANGLES, self.indices.size, gl.GL_UNSIGNED_INT, None)
         gl.glBindVertexArray(0)
 
-
     def dispose(self):
         gl.glDeleteVertexArrays(1, self.vao)
         gl.glDeleteBuffers(1, self.vbo)
