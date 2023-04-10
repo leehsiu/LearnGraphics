@@ -49,5 +49,9 @@ class Shader:
         elif isinstance(value, np.ndarray):
             if value.size == 16:
                 gl.glUniformMatrix4fv(location, 1, gl.GL_TRUE, value)
+            elif value.size == 9:
+                gl.glUniformMatrix3fv(location, 1, gl.GL_TRUE, value)
+            elif value.size == 3:
+                gl.glUniform3fv(location, 1, value)
                 
                 

@@ -22,11 +22,15 @@ class GLFWViewer:
     def __init__(self, width, height, title="window"):
         
         # init opengl
+        self.width = width
+        self.height = height
         self.window = init_glfw(width, height, title)
         glfw.set_framebuffer_size_callback(self.window,self.resize)
 
 
     def resize(self,window,width,height):
+        self.width = width
+        self.height = height
         gl.glViewport(0, 0, width, height)
 
     def handle_input(self):

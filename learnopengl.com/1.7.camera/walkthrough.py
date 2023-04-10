@@ -10,25 +10,10 @@ import ctypes
 import numpy as np
 import OpenGL.GL as gl
 
-def normalize(vec):
-    return vec / np.linalg.norm(vec)
+# https://learnopengl.com/code_viewer_gh.php?code=src/1.getting_started/
+# 7.3.camera_mouse_zoom/camera_mouse_zoom.cpp
 
-
-# https://registry.khronos.org/OpenGL-Refpages/gl2.1/xhtml/gluLookAt.xml
-def lookAt(position, center, up):
-    z = normalize(position - center)
-    x = normalize(np.cross(up, z))
-    y = np.cross(z, x)
-    
-    rot = np.vstack([x,y,z])
-    trans = - rot @ position
-    mat = np.eye(4)
-    mat[:3,:3] = rot
-    mat[:3, -1] = trans
-    return mat
-
-
-    
+# We are now adding new Camera class and Control class to the lib.
 
 
 class Triangles:
@@ -100,24 +85,90 @@ class App(xglut.GLFWViewer):
             1.5,  2.0, -2.5,
             1.5,  0.2, -1.5,
             -1.3,  1.0, -1.5], np.float32).reshape(-1, 3)
-        self.mix_val = 0.2
-        # use our shaders class
-
+        
+        self.last_time = glfw.get_time()
+        self.camera_pos = np.array([0.,0.,3.])
+        self.camera_up = np.array([0, 1.0, 0.])
+        self.camera_front = np.array([0, 0, -1.0])
+        self.camera_fov = 45
+        self.camera_yaw = -90
+        self.camera_pitch = 0.0
+        
+        
+        self.xprev = 0
+        self.yprev = 0
+        
+        
+        
+        glfw.set_cursor_pos_callback(self.window, self.mouse_callback)
+        glfw.set_scroll_callback(self.window,self.scroll_callback)
         self.view()
+        
+        
+    def scroll_callback(self,window,xoffset,yoffset):
+        self.camera_fov -= yoffset
+        self.camera_fov = np.clip(self.camera_fov, 1.0, 45)
+    
+    
+    def mouse_callback(self,window,xpos,ypos):
+        xoffset = xpos - self.xprev
+        yoffset = ypos - self.yprev
+        
+        
+        sensitivity = 0.1
+        xoffset *= sensitivity
+        yoffset *= sensitivity
+
+
+        if self.move_eye:
+            self.camera_yaw += xoffset
+            self.camera_pitch -= yoffset
+                
+        self.camera_pitch = np.clip(self.camera_pitch, -89,89)
+        
+        self.camera_front[0] = np.cos(glm.deg2rad(self.camera_yaw)) \
+            * np.cos(glm.deg2rad(self.camera_pitch))
+        self.camera_front[1] = np.sin(glm.deg2rad(self.camera_pitch))
+        self.camera_front[2] = np.sin(glm.deg2rad(self.camera_yaw)) \
+            * np.cos(glm.deg2rad(self.camera_pitch))
+        
+        
+        self.xprev = xpos
+        self.yprev = ypos
+        
         
 
     def handle_input(self):
+        current_time = glfw.get_time()
+        delta_time = current_time - self.last_time
+        self.last_time = current_time
+        speed = 2.5 * delta_time
+        
+        
         if glfw.get_key(self.window, GLFW.GLFW_KEY_ESCAPE) == GLFW.GLFW_PRESS:
             glfw.set_window_should_close(self.window, True)
-        elif glfw.get_key(self.window, GLFW.GLFW_KEY_UP) == GLFW.GLFW_PRESS:
-            self.mix_val += 0.0001
-            self.mix_val = min(self.mix_val, 1.0)
-        elif glfw.get_key(self.window, GLFW.GLFW_KEY_DOWN) == GLFW.GLFW_PRESS:
-            self.mix_val -= 0.0001
-            self.mix_val = max(self.mix_val, 0.0)
+        elif glfw.get_key(self.window, GLFW.GLFW_KEY_W) == GLFW.GLFW_PRESS:
+            self.camera_pos += speed * self.camera_front
+        elif glfw.get_key(self.window, GLFW.GLFW_KEY_S) == GLFW.GLFW_PRESS:
+            self.camera_pos -= speed * self.camera_front
+        elif glfw.get_key(self.window, GLFW.GLFW_KEY_A) == GLFW.GLFW_PRESS:
+            self.camera_pos -= glm.normalize(
+                np.cross(self.camera_front, self.camera_up)) * speed
+        elif glfw.get_key(self.window, GLFW.GLFW_KEY_D) == GLFW.GLFW_PRESS:
+            self.camera_pos += glm.normalize(
+                np.cross(self.camera_front, self.camera_up)) * speed
+        
+        # Only look around when left button is pressed
+        self.move_eye = False
+        if glfw.get_mouse_button(self.window, GLFW.GLFW_MOUSE_BUTTON_LEFT)\
+            == GLFW.GLFW_PRESS:
+            self.move_eye = True
+            self.xprev,self.yprev = glfw.get_cursor_pos(self.window)
+            
+            
 
     def draw(self):
-            # main drawing
+        # main drawing
         gl.glClearColor(0.2, 0.3, 0.3, 1)
         
         # clear both color buffer and z-buffer
@@ -126,26 +177,21 @@ class App(xglut.GLFWViewer):
         self.shader.use()
         self.shader.set_uniform("texture0", 0)
         self.shader.set_uniform("texture1", 1)
-        self.shader.set_uniform("mixValue", self.mix_val)
         gl.glActiveTexture(gl.GL_TEXTURE0)
         self.texture0.use()
         gl.glActiveTexture(gl.GL_TEXTURE1)
         self.texture1.use()
 
-        projection_mat = glm.perspective(45, 640./480, 0.01, 100.0)
+        projection_mat = glm.perspective(
+            self.camera_fov, self.width*1.0/self.height, 0.01, 100.0)
         projection_mat = projection_mat.astype(np.float32)
         self.shader.set_uniform("projection", projection_mat)
         
         
-        radius = 10.0
-        camX = np.sin(glfw.get_time()) * radius
-        camZ = np.cos(glfw.get_time()) * radius
-        view = lookAt(
-            np.array([camX, 0.0, camZ]),
-            np.array([0, 0, 0]),
-            np.array([0, 1., 0.0])
-        )
-        print(view)
+        view = glm.lookAt(
+            self.camera_pos,
+            self.camera_pos + self.camera_front,
+            self.camera_up)
 
         self.shader.set_uniform("view", view)
         

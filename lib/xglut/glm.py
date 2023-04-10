@@ -1,8 +1,19 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
+__all__ = [
+    'perspective',
+    'lookAt',
+]
+
 def deg2rad(degree):
     return degree * np.pi / 180
+
+
+def normalize(vec):
+    return vec / np.linalg.norm(vec)
+
+# https://registry.khronos.org/OpenGL-Refpages/gl2.1/xhtml/gluPerspective.xml
 
 def perspective(fov, aspect, z_near, z_far):
     fov = deg2rad(fov)
@@ -23,4 +34,17 @@ def rotate(angle, axis):
     mat = R.from_rotvec(angle * axis).as_matrix()
     return mat
 
+
+
+# https://registry.khronos.org/OpenGL-Refpages/gl2.1/xhtml/gluLookAt.xml
+def lookAt(position, center, up):
+    z = normalize(position - center)
+    x = normalize(np.cross(up, z))
+    y = np.cross(z, x)
     
+    rot = np.vstack([x,y,z])
+    trans = - rot @ position
+    mat = np.eye(4)
+    mat[:3,:3] = rot
+    mat[:3, -1] = trans
+    return mat
