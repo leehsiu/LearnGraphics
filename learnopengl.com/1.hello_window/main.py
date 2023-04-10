@@ -1,3 +1,4 @@
+import sys
 import glfw
 import glfw.GLFW as GLFW
 import OpenGL.GL as gl
@@ -9,39 +10,52 @@ import OpenGL.GL as gl
 def init_glfw(width, height, title="window"):
     glfw.init()
     
-    # Follow are required on macOS to use OpenGL 4.1 
+    # setup OpenGL context
     glfw.window_hint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3)
     glfw.window_hint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3)
     glfw.window_hint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE)
-    glfw.window_hint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE)
-    # glfw.window_hint(GLFW.GLFW_DOUBLEBUFFER, gl.GL_FALSE)
+    
+    if sys.platform == "darwin":
+        glfw.window_hint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE)
+    
     window = glfw.create_window(width, height, title, None, None)
+    
     glfw.make_context_current(window)
-    glfw.set_framebuffer_size_callback(window, framebuffer_size_callback)
-    gl.glEnable(gl.GL_PROGRAM_POINT_SIZE)
-    print(gl.glGetString(gl.GL_VERSION))
+    info = """
+        Vendor: {0}
+        Renderer: {1}
+        OpenGL Version: {2}
+        Shader Version: {3}
+    """.format(
+        gl.glGetString(gl.GL_VENDOR),
+        gl.glGetString(gl.GL_RENDERER),
+        gl.glGetString(gl.GL_VERSION),
+        gl.glGetString(gl.GL_SHADING_LANGUAGE_VERSION)
+    )
+    print(info)
+
     return window
-
-
-def framebuffer_size_callback(window, width, height):
-    gl.glViewport(0, 0, width, height)
 
 
 class App:
     def __init__(self, window):
         # initialise opengl
         self.window = window
-        self.mainLoop()
+        glfw.set_framebuffer_size_callback(window,self.resize)
+        
+        self.mainloop()
+
+    def resize(self,window, width,height):
+        gl.glViewport(0,0, width, height)
+        
 
     def process_input(self):
         if glfw.get_key(self.window, GLFW.GLFW_KEY_ESCAPE) == GLFW.GLFW_PRESS:
             glfw.set_window_should_close(self.window, True)
 
-    def mainLoop(self):
-        running = True
-        while (running):
-            if glfw.window_should_close(self.window):
-                running = False
+    def mainloop(self):
+        while not glfw.window_should_close(self.window):
+            
             self.process_input()
             # main drawing
             gl.glClearColor(0.8, 0.2, 0.2, 1)
@@ -57,4 +71,4 @@ class App:
 
 if __name__ == "__main__":
     window = init_glfw(640, 480)
-    myApp = App(window)
+    app = App(window)

@@ -20,8 +20,6 @@ def init_glfw(width, height, title="window"):
     
     window = glfw.create_window(width, height, title, None, None)
     glfw.make_context_current(window)
-    glfw.set_framebuffer_size_callback(window, framebuffer_size_callback)
-    gl.glEnable(gl.GL_PROGRAM_POINT_SIZE)
 
     return window
 
@@ -102,10 +100,8 @@ class Shaders:
 class Material:
     def __init__(self, filepath):
         self.texture = gl.glGenTextures(1)
-        # all upcoming GL_TEXTURE_2D operations now have effect on this texture
-        # object
+        
         gl.glBindTexture(gl.GL_TEXTURE_2D, self.texture)
-        # set the texture wrapping parameters
 
         gl.glTexParameteri(
             gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_REPEAT)
@@ -175,13 +171,12 @@ class App:
     def __init__(self, window):
         # init opengl
         self.window = window
+        glfw.set_framebuffer_size_callback(self.window,self.resize)
 
         # enable z-buffering
         gl.glEnable(gl.GL_DEPTH_TEST)
-        # -------------------------------------
         self.shader = Shaders.load('./vertex.vs', './fragment.fs')
 
-        # -----------------------------------
         vertices = np.loadtxt('./cube.txt').astype(np.float32)
 
         self.triangle = Triangles(vertices)
@@ -202,9 +197,14 @@ class App:
             1.5,  0.2, -1.5,
             -1.3,  1.0, -1.5], np.float32).reshape(-1, 3)
         self.mix_val = 0.2
-        # use our shaders class
+        
+        
 
-        self.mainLoop()
+        self.mainloop()
+
+    def resize(self,window,width,height):
+        
+        gl.glViewport(0, 0, width, height)
 
     def process_input(self):
         if glfw.get_key(self.window, GLFW.GLFW_KEY_ESCAPE) == GLFW.GLFW_PRESS:
@@ -216,11 +216,10 @@ class App:
             self.mix_val -= 0.0001
             self.mix_val = max(self.mix_val, 0.0)
 
-    def mainLoop(self):
-        running = True
-        while (running):
-            if glfw.window_should_close(self.window):
-                running = False
+    def mainloop(self):
+        
+        while not glfw.window_should_close(self.window):
+            
             self.process_input()
             # main drawing
             gl.glClearColor(0.2, 0.3, 0.3, 1)

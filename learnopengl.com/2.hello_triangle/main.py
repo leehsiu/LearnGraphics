@@ -1,3 +1,4 @@
+import sys
 import glfw
 import glfw.GLFW as GLFW
 import OpenGL.GL as gl
@@ -7,24 +8,21 @@ import ctypes
 # orignal CPP code: https://learnopengl.com/code_viewer_gh.php?code=src/1.
 # getting_started/2.2.hello_triangle_indexed/hello_triangle_indexed.cpp
 
-
 def init_glfw(width, height, title="window"):
     glfw.init()
+    
+    # setup OpenGL context
     glfw.window_hint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3)
     glfw.window_hint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3)
     glfw.window_hint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE)
-    glfw.window_hint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE)
-    glfw.window_hint(GLFW.GLFW_DOUBLEBUFFER, gl.GL_FALSE)
+    
+    if sys.platform == "darwin":
+        glfw.window_hint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE)
+    
     window = glfw.create_window(width, height, title, None, None)
     glfw.make_context_current(window)
-    glfw.set_framebuffer_size_callback(window, framebuffer_size_callback)
-    gl.glEnable(gl.GL_PROGRAM_POINT_SIZE)
 
     return window
-
-
-def framebuffer_size_callback(window, width, height):
-    gl.glViewport(0, 0, width, height)
 
 
 class Triangles:
@@ -92,23 +90,32 @@ class Triangles:
 
 class App:
     def __init__(self, window):
-        # init opengl
         self.window = window
 
-        # -------------------------------------
-        # pyopengl provides convenient way to build shaders
-        with open('./vertex.vert', 'r') as f:
+        # build shaders
+        with open('./vertex.vs', 'r') as f:
             src = f.readlines()
-        vertex_shader = glshaders.compileShader(src, gl.GL_VERTEX_SHADER)
-
-        with open('./fragment.frag', 'r') as f:
+            
+        vertex = gl.glCreateShader(gl.GL_VERTEX_SHADER)
+        gl.glShaderSource(vertex, src)
+        gl.glCompileShader(vertex)
+        
+        with open('./green.fs', 'r') as f:
             src = f.readlines()
-        fragment_shader = glshaders.compileShader(src, gl.GL_FRAGMENT_SHADER)
-        self.shader = glshaders.compileProgram(
-            vertex_shader, fragment_shader)
+        fragment = gl.glCreateShader(gl.GL_FRAGMENT_SHADER)
+        gl.glShaderSource(fragment, src)
+        gl.glCompileShader(fragment)
+        
+        self.shader = gl.glCreateProgram()
+        gl.glAttachShader(self.shader, vertex)
+        gl.glAttachShader(self.shader, fragment)
+        gl.glLinkProgram(self.shader)
+        
+        gl.glDeleteShader(vertex)
+        gl.glDeleteShader(fragment)
+        
 
-        # -----------------------------------
-        # Init vertex data
+        # init vertex data
         vertices = [
             0.5,  0.5, 0.0,  # top right
             0.5, -0.5, 0.0,  # bottom right
@@ -123,25 +130,24 @@ class App:
         indices = np.array(indices, np.uint32)
         self.triangle = Triangles(vertices, indices)
         self.triangle.upload()
+        
+        glfw.set_framebuffer_size_callback(window,self.resize)
 
-        self.mainLoop()
+        self.mainloop()
+
+    def resize(self,window, width,height):
+        gl.glViewport(0,0, width, height)
 
     def process_input(self):
         if glfw.get_key(self.window, GLFW.GLFW_KEY_ESCAPE) == GLFW.GLFW_PRESS:
             glfw.set_window_should_close(self.window, True)
 
-    def mainLoop(self):
-        running = True
-        while (running):
-            if glfw.window_should_close(self.window):
-                running = False
+    def mainloop(self):
+        while not glfw.window_should_close(self.window):
             self.process_input()
             # main drawing
             gl.glClearColor(0.2, 0.3, 0.3, 1)
             gl.glClear(gl.GL_COLOR_BUFFER_BIT)
-
-            # gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
-            # gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
 
             gl.glUseProgram(self.shader)
             self.triangle.draw()
@@ -158,4 +164,4 @@ class App:
 
 if __name__ == "__main__":
     window = init_glfw(640, 480)
-    myApp = App(window)
+    app = App(window)

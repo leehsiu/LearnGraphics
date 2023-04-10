@@ -1,29 +1,28 @@
+import sys
 import glfw
 import glfw.GLFW as GLFW
 import OpenGL.GL as gl
 import OpenGL.GL.shaders as glshaders
 import numpy as np
 import ctypes
-# Draw two triangles using two VAOs and two different shaders
 
+# Draw two triangles using two VAOs and two shaders
 
 def init_glfw(width, height, title="window"):
+    
     glfw.init()
+    # setup OpenGL context
     glfw.window_hint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3)
     glfw.window_hint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3)
     glfw.window_hint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE)
-    glfw.window_hint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE)
-    glfw.window_hint(GLFW.GLFW_DOUBLEBUFFER, gl.GL_FALSE)
+    
+    if sys.platform == "darwin":
+        glfw.window_hint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE)
+    
     window = glfw.create_window(width, height, title, None, None)
     glfw.make_context_current(window)
-    glfw.set_framebuffer_size_callback(window, framebuffer_size_callback)
-    gl.glEnable(gl.GL_PROGRAM_POINT_SIZE)
 
     return window
-
-
-def framebuffer_size_callback(window, width, height):
-    gl.glViewport(0, 0, width, height)
 
 
 class Triangles:
@@ -50,27 +49,13 @@ class Triangles:
         gl.glBufferData(
             gl.GL_ELEMENT_ARRAY_BUFFER, self.indices.nbytes, self.indices,
             gl.GL_STATIC_DRAW)
-
+        
         gl.glVertexAttribPointer(
             0, 3, gl.GL_FLOAT, gl.GL_FALSE, 3 * ctypes.sizeof(ctypes.c_float),
             ctypes.c_void_p(0))
-
+        
         gl.glEnableVertexAttribArray(0)
-
-        # note that this is allowed, the call to glVertexAttribPointer
-        # registered VBO as the vertex attribute's bound vertex buffer object
-        # so afterwards we can safely unbind
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, 0)
-
-        # remember: do NOT unbind the EBO while a VAO is active as the bound
-        # element buffer object IS stored in the VAO; keep the EBO bound.
-        # gl.glBindBuffer(gl.GL_ELEMENT_ARRAY_BUFFER, 0);
-
-        # You can unbind the VAO afterwards so other VAO calls won't
-        # accidentally modify this VAO, but this rarely happens.
-        # Modifying other VAOs requires a call to glBindVertexArray anyways so
-        # we generally don't unbind VAOs (nor VBOs) when it's not directly
-        # necessary.
         gl.glBindVertexArray(0)
         return
 
@@ -79,9 +64,7 @@ class Triangles:
         gl.glDrawElements(
             gl.GL_TRIANGLES, self.indices.size, gl.GL_UNSIGNED_INT, None)
         gl.glBindVertexArray(0)
-        # to only draw the first triangle
-        # gl.glDrawElements(gl.GL_TRIANGLES, 1 * 3,
-        #                   gl.GL_UNSIGNED_INT, None)
+
 
     def dispose(self):
         gl.glDeleteVertexArrays(1, self.vao)
@@ -94,24 +77,41 @@ class App:
         # init opengl
         self.window = window
 
-        # -------------------------------------
-        # pyopengl provides convenient way to build shaders
-        with open('./vertex.vert', 'r') as f:
+        # build shaders
+        with open('./vertex.vs', 'r') as f:
             src = f.readlines()
-        vertex_shader = glshaders.compileShader(src, gl.GL_VERTEX_SHADER)
-
-        with open('./green.frag', 'r') as f:
+            
+        vertex = gl.glCreateShader(gl.GL_VERTEX_SHADER)
+        gl.glShaderSource(vertex, src)
+        gl.glCompileShader(vertex)
+        
+        with open('./green.fs', 'r') as f:
             src = f.readlines()
-        fragment_shader0 = glshaders.compileShader(src, gl.GL_FRAGMENT_SHADER)
-
-        with open('./yellow.frag', 'r') as f:
+        fragment0 = gl.glCreateShader(gl.GL_FRAGMENT_SHADER)
+        gl.glShaderSource(fragment0, src)
+        gl.glCompileShader(fragment0)
+        
+        with open('./yellow.fs', 'r') as f:
             src = f.readlines()
-        fragment_shader1 = glshaders.compileShader(src, gl.GL_FRAGMENT_SHADER)
-
-        self.shader0 = glshaders.compileProgram(
-            vertex_shader, fragment_shader0)
-        self.shader1 = glshaders.compileProgram(
-            vertex_shader, fragment_shader1)
+        fragment1 = gl.glCreateShader(gl.GL_FRAGMENT_SHADER)
+        gl.glShaderSource(fragment1, src)
+        gl.glCompileShader(fragment1)
+        
+        self.shader0 = gl.glCreateProgram()
+        gl.glAttachShader(self.shader0, vertex)
+        gl.glAttachShader(self.shader0, fragment0)
+        gl.glLinkProgram(self.shader0)
+        
+        
+        self.shader1 = gl.glCreateProgram()
+        gl.glAttachShader(self.shader1, vertex)
+        gl.glAttachShader(self.shader1, fragment1)
+        gl.glLinkProgram(self.shader1)
+        
+        gl.glDeleteShader(vertex)
+        gl.glDeleteShader(fragment0)
+        gl.glDeleteShader(fragment1)
+        
 
         # -----------------------------------
         # Init vertex data
@@ -135,25 +135,28 @@ class App:
         self.triangle1 = Triangles(vertices1, indices)
         self.triangle0.upload()
         self.triangle1.upload()
+        
+        
+        glfw.set_framebuffer_size_callback(window,self.resize)
 
-        self.mainLoop()
+        self.mainloop()
+
+
+    def resize(self,window, width,height):
+        gl.glViewport(0,0, width, height)
 
     def process_input(self):
         if glfw.get_key(self.window, GLFW.GLFW_KEY_ESCAPE) == GLFW.GLFW_PRESS:
             glfw.set_window_should_close(self.window, True)
 
-    def mainLoop(self):
-        running = True
-        while (running):
-            if glfw.window_should_close(self.window):
-                running = False
+    def mainloop(self):
+        
+        while not glfw.window_should_close(self.window):
+            
             self.process_input()
             # main drawing
             gl.glClearColor(0.0, 0.0, 0.0, 1)
             gl.glClear(gl.GL_COLOR_BUFFER_BIT)
-
-            # gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
-            # gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
 
             gl.glUseProgram(self.shader0)
             self.triangle0.draw()

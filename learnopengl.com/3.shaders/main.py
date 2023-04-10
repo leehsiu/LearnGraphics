@@ -42,7 +42,7 @@ class Shaders:
         gl.glDeleteShader(vertex)
         gl.glDeleteShader(fragment)
         
-        
+        # following does not work on MacOS 
         # v_shader = glshaders.compileShader(vertex_shader, gl.GL_VERTEX_SHADER)
         # f_shader = glshaders.compileShader(
         #     fragment_shader, gl.GL_FRAGMENT_SHADER)
@@ -180,7 +180,7 @@ class App:
 
         # -------------------------------------
         # use our shaders class
-        self.shader = Shaders.load('./vertex.vert', './fragment.frag')
+        self.shader = Shaders.load('./vertex.vs', './fragment.fs')
 
         # -----------------------------------
         # Init vertex data
