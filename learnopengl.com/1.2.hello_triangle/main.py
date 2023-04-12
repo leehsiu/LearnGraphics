@@ -1,29 +1,15 @@
 import sys
+sys.path.append('../../lib')
+
+import xglut
+
 import glfw
 import glfw.GLFW as GLFW
 import OpenGL.GL as gl
-import OpenGL.GL.shaders as glshaders
 import numpy as np
 import ctypes
 # orignal CPP code: https://learnopengl.com/code_viewer_gh.php?code=src/1.
 # getting_started/2.2.hello_triangle_indexed/hello_triangle_indexed.cpp
-
-def init_glfw(width, height, title="window"):
-    glfw.init()
-    
-    # setup OpenGL context
-    glfw.window_hint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3)
-    glfw.window_hint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3)
-    glfw.window_hint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE)
-    
-    if sys.platform == "darwin":
-        glfw.window_hint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE)
-    
-    window = glfw.create_window(width, height, title, None, None)
-    glfw.make_context_current(window)
-
-    return window
-
 
 class Triangles:
     def __init__(self, vertices, indices):
@@ -32,6 +18,7 @@ class Triangles:
         self.ebo = None
         self.vertices = vertices
         self.indices = indices
+        self.upload()
 
     def upload(self):
 
@@ -44,15 +31,15 @@ class Triangles:
         gl.glBufferData(
             gl.GL_ARRAY_BUFFER, self.vertices.nbytes, self.vertices,
             gl.GL_STATIC_DRAW)
+        gl.glVertexAttribPointer(
+            0, 3, gl.GL_FLOAT, gl.GL_FALSE, 3 * ctypes.sizeof(ctypes.c_float),
+            ctypes.c_void_p(0))
+
 
         gl.glBindBuffer(gl.GL_ELEMENT_ARRAY_BUFFER, self.ebo)
         gl.glBufferData(
             gl.GL_ELEMENT_ARRAY_BUFFER, self.indices.nbytes, self.indices,
             gl.GL_STATIC_DRAW)
-
-        gl.glVertexAttribPointer(
-            0, 3, gl.GL_FLOAT, gl.GL_FALSE, 3 * ctypes.sizeof(ctypes.c_float),
-            ctypes.c_void_p(0))
 
         gl.glEnableVertexAttribArray(0)
 
@@ -78,9 +65,7 @@ class Triangles:
         gl.glDrawElements(
             gl.GL_TRIANGLES, self.indices.size, gl.GL_UNSIGNED_INT, None)
         gl.glBindVertexArray(0)
-        # to only draw the first triangle
-        # gl.glDrawElements(gl.GL_TRIANGLES, 1 * 3,
-        #                   gl.GL_UNSIGNED_INT, None)
+
 
     def dispose(self):
         gl.glDeleteVertexArrays(1, self.vao)
@@ -88,9 +73,9 @@ class Triangles:
         gl.glDeleteBuffers(1, self.ebo)
 
 
-class App:
-    def __init__(self, window):
-        self.window = window
+class App(xglut.GLFWViewer):
+    def __init__(self,width,height,title):
+        super().__init__(width,height,title)
 
         # build shaders
         with open('./vertex.vs', 'r') as f:
@@ -129,39 +114,20 @@ class App:
             ]
         indices = np.array(indices, np.uint32)
         self.triangle = Triangles(vertices, indices)
-        self.triangle.upload()
-        
-        glfw.set_framebuffer_size_callback(window,self.resize)
 
-        self.mainloop()
+        self.view()
 
-    def resize(self,window, width,height):
-        gl.glViewport(0,0, width, height)
 
-    def process_input(self):
-        if glfw.get_key(self.window, GLFW.GLFW_KEY_ESCAPE) == GLFW.GLFW_PRESS:
-            glfw.set_window_should_close(self.window, True)
+    def draw(self):
+        gl.glClearColor(0.2, 0.3, 0.3, 1)
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT)
+        gl.glUseProgram(self.shader)
+        self.triangle.draw()
 
-    def mainloop(self):
-        while not glfw.window_should_close(self.window):
-            self.process_input()
-            # main drawing
-            gl.glClearColor(0.2, 0.3, 0.3, 1)
-            gl.glClear(gl.GL_COLOR_BUFFER_BIT)
-
-            gl.glUseProgram(self.shader)
-            self.triangle.draw()
-
-            glfw.swap_buffers(self.window)
-            glfw.poll_events()
-        self.quit()
-
-    def quit(self):
+    def dispose(self):
         gl.glDeleteProgram(self.shader)
         self.triangle.dispose()
-        glfw.terminate()
 
 
 if __name__ == "__main__":
-    window = init_glfw(640, 480)
-    app = App(window)
+    app = App(640,480,"Hello Triangle")

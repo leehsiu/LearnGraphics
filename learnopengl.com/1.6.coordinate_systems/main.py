@@ -1,31 +1,18 @@
+import sys
+sys.path.append('../../lib')
+
 import glfw
 import glfw.GLFW as GLFW
 import OpenGL.GL as gl
-import OpenGL.GL.shaders as glshaders
 import numpy as np
 import ctypes
 import PIL.Image
 from scipy.spatial.transform import Rotation as R
 
+import xglut
 # https://learnopengl.com/code_viewer_gh.php?code=src/1.getting_started/
 # 6.3.coordinate_systems_multiple/coordinate_systems_multiple.cpp
 
-
-def init_glfw(width, height, title="window"):
-    glfw.init()
-    glfw.window_hint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3)
-    glfw.window_hint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 3)
-    glfw.window_hint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE)
-    glfw.window_hint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GLFW.GLFW_TRUE)
-    
-    window = glfw.create_window(width, height, title, None, None)
-    glfw.make_context_current(window)
-
-    return window
-
-
-def framebuffer_size_callback(window, width, height):
-    gl.glViewport(0, 0, width, height)
 
 # https://registry.khronos.org/OpenGL-Refpages/gl2.1/xhtml/gluPerspective.xml
 # Notice that the doc is wrong. There should be a -1. as in 
@@ -48,92 +35,14 @@ def rotate(angle, axis):
     mat = R.from_rotvec(angle * axis).as_matrix()
     return mat
 
-    
-    
-
-class Shaders:
-    def __init__(self, vertex_shader, fragment_shader):
-        vertex = gl.glCreateShader(gl.GL_VERTEX_SHADER)
-        gl.glShaderSource(vertex, vertex_shader)
-        gl.glCompileShader(vertex)
-        
-        fragment = gl.glCreateShader(gl.GL_FRAGMENT_SHADER)
-        gl.glShaderSource(fragment, fragment_shader)
-        gl.glCompileShader(fragment)
-        
-        self.shader = gl.glCreateProgram()
-        gl.glAttachShader(self.shader, vertex)
-        gl.glAttachShader(self.shader, fragment)
-        gl.glLinkProgram(self.shader)
-        
-        gl.glDeleteShader(vertex)
-        gl.glDeleteShader(fragment)
-        
-
-    @classmethod
-    def load(cls, vertex_path, fragment_path):
-        with open(vertex_path, 'r') as f:
-            vertex_src = f.readlines()
-        with open(fragment_path, 'r') as f:
-            fragment_src = f.readlines()
-
-        return cls(vertex_src, fragment_src)
-
-    def use(self):
-        gl.glUseProgram(self.shader)
-
-    def dispose(self):
-        gl.glDeleteProgram(self.shader)
-
-    def set_uniform(self, name, value):
-        location = gl.glGetUniformLocation(self.shader, name)
-        # TODO: support more type
-        if isinstance(value, int):
-            gl.glUniform1i(location, value)
-        elif isinstance(value, float):
-            gl.glUniform1f(location, value)
-        elif isinstance(value, np.ndarray):
-            if value.size == 16:
-                gl.glUniformMatrix4fv(location, 1, gl.GL_TRUE, value)
-
-
-class Material:
-    def __init__(self, filepath):
-        self.texture = gl.glGenTextures(1)
-        
-        gl.glBindTexture(gl.GL_TEXTURE_2D, self.texture)
-
-        gl.glTexParameteri(
-            gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_REPEAT)
-        gl.glTexParameteri(
-            gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_REPEAT)
-        gl.glTexParameteri(
-            gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER,
-            gl.GL_LINEAR_MIPMAP_LINEAR)
-        gl.glTexParameteri(
-            gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
-
-        # load image, create texture and generate mipmaps
-        img = PIL.Image.open(filepath)
-        img_data = img.convert("RGB").tobytes()
-
-        gl.glTexImage2D(
-            gl.GL_TEXTURE_2D, 0, gl.GL_RGB, img.size[0], img.size[1], 0,
-            gl.GL_RGB, gl.GL_UNSIGNED_BYTE, img_data)
-        gl.glGenerateMipmap(gl.GL_TEXTURE_2D)
-
-    def use(self):
-        gl.glBindTexture(gl.GL_TEXTURE_2D, self.texture)
-
-    def dispose(self):
-        gl.glDeleteTextures(1, self.texture)
-
 
 class Triangles:
     def __init__(self, vertices):
         self.vao = None
         self.vbo = None
         self.vertices = vertices
+        self.count = self.vertices.shape[0]
+        self.upload()
 
     def upload(self):
 
@@ -159,7 +68,7 @@ class Triangles:
 
     def draw(self):
         gl.glBindVertexArray(self.vao)
-        gl.glDrawArrays(gl.GL_TRIANGLES, 0, 36)
+        gl.glDrawArrays(gl.GL_TRIANGLES, 0, self.count)
         gl.glBindVertexArray(0)
 
     def dispose(self):
@@ -167,23 +76,20 @@ class Triangles:
         gl.glDeleteBuffers(1, self.vbo)
 
 
-class App:
-    def __init__(self, window):
-        # init opengl
-        self.window = window
-        glfw.set_framebuffer_size_callback(self.window,self.resize)
+class App(xglut.GLFWViewer):
+    def __init__(self, width,height,title="Coordinate"):
+        super().__init__(width,height)
+        
 
-        # enable z-buffering
-        gl.glEnable(gl.GL_DEPTH_TEST)
-        self.shader = Shaders.load('./vertex.vs', './fragment.fs')
-
+        self.shader = xglut.Shader.load('./vertex.vs', './fragment.fs')
+        
         vertices = np.loadtxt('./cube.txt').astype(np.float32)
-
         self.triangle = Triangles(vertices)
-        self.triangle.upload()
 
-        self.texture0 = Material('../../assets/textures/container.jpg')
-        self.texture1 = Material('../../assets/textures/awesomeface.png')
+        self.texture0 = xglut.Texture.load(
+            '../../assets/textures/container.jpg')
+        self.texture1 = xglut.Texture.load(
+            '../../assets/textures/awesomeface.png')
 
         self.cube_positions = np.array([
             0.0, 0.0, 0.0,
@@ -199,67 +105,60 @@ class App:
         self.mix_val = 0.2
         
         
+        # enable z-buffering
+        gl.glEnable(gl.GL_DEPTH_TEST)
 
-        self.mainloop()
+        self.view()
 
-    def resize(self,window,width,height):
-        
-        gl.glViewport(0, 0, width, height)
 
-    def process_input(self):
+    def handle_input(self):
         if glfw.get_key(self.window, GLFW.GLFW_KEY_ESCAPE) == GLFW.GLFW_PRESS:
             glfw.set_window_should_close(self.window, True)
         elif glfw.get_key(self.window, GLFW.GLFW_KEY_UP) == GLFW.GLFW_PRESS:
-            self.mix_val += 0.0001
+            self.mix_val += 0.01
             self.mix_val = min(self.mix_val, 1.0)
         elif glfw.get_key(self.window, GLFW.GLFW_KEY_DOWN) == GLFW.GLFW_PRESS:
-            self.mix_val -= 0.0001
+            self.mix_val -= 0.01
             self.mix_val = max(self.mix_val, 0.0)
 
-    def mainloop(self):
+    def draw(self):
         
-        while not glfw.window_should_close(self.window):
             
-            self.process_input()
-            # main drawing
-            gl.glClearColor(0.2, 0.3, 0.3, 1)
+        # main drawing
+        gl.glClearColor(0.2, 0.3, 0.3, 1)  
+        # clear both color buffer and z-buffer
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+
+        self.shader.use()
+        self.shader.set_uniform("texture0", 0)
+        self.shader.set_uniform("texture1", 1)
+        self.shader.set_uniform("mixValue", self.mix_val)
+        gl.glActiveTexture(gl.GL_TEXTURE0)
+        self.texture0.use()
+        gl.glActiveTexture(gl.GL_TEXTURE1)
+        self.texture1.use()
+
+        projection_mat = perspective(45, 640./480, 0.01, 100.0)
+        projection_mat = projection_mat.astype(np.float32)
+        view_mat = np.eye(4)
+        view_mat[:3, -1] = np.array([0.0, 0.0, -3.0])
+        view_mat = view_mat.astype(np.float32)
+        self.shader.set_uniform("projection", projection_mat)
+        self.shader.set_uniform("view", view_mat)
             
-            # clear both color buffer and z-buffer
-            gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
-
-            self.shader.use()
-            self.shader.set_uniform("texture0", 0)
-            self.shader.set_uniform("texture1", 1)
-            self.shader.set_uniform("mixValue", self.mix_val)
-            gl.glActiveTexture(gl.GL_TEXTURE0)
-            self.texture0.use()
-            gl.glActiveTexture(gl.GL_TEXTURE1)
-            self.texture1.use()
-
-            projection_mat = perspective(45, 640./480, 0.01, 100.0)
-            projection_mat = projection_mat.astype(np.float32)
-            view_mat = np.eye(4)
-            view_mat[:3, -1] = np.array([0.0, 0.0, -3.0])
-            view_mat = view_mat.astype(np.float32)
-            self.shader.set_uniform("projection", projection_mat)
-            self.shader.set_uniform("view", view_mat)
+        for i, r in enumerate(self.cube_positions):
+            model_mat = np.eye(4)
+            model_mat[:3, -1] = r
+            axis = np.array([1.0, 0.3, 0.5])
+            angle = i * 20.0
+            model_mat[:3, :3] = rotate(angle, axis)
+            model_mat = model_mat.astype(np.float32)
             
-            for i, r in enumerate(self.cube_positions):
-                model_mat = np.eye(4)
-                model_mat[:3, -1] = r
-                axis = np.array([1.0, 0.3, 0.5])
-                angle = i * 20.0
-                model_mat[:3, :3] = rotate(angle, axis)
-                model_mat = model_mat.astype(np.float32)
-                
-                self.shader.set_uniform("model", model_mat)
-                self.triangle.draw()
+            self.shader.set_uniform("model", model_mat)
+            self.triangle.draw()
 
-            glfw.swap_buffers(self.window)
-            glfw.poll_events()
-        self.quit()
 
-    def quit(self):
+    def dispose(self):
         self.shader.dispose()
         self.triangle.dispose()
         self.texture0.dispose()
@@ -268,5 +167,4 @@ class App:
 
 
 if __name__ == "__main__":
-    window = init_glfw(640, 480)
-    myApp = App(window)
+    myApp = App(640,480)

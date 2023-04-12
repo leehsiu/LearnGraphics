@@ -74,97 +74,58 @@ class App(xglut.GLFWViewer):
         self.light_cube.upload()
         
         self.shininess = 20.0
-        
-        
-        self.last_time = glfw.get_time()
-        self.camera_pos = np.array([0.,0.,3.])
-        self.camera_up = np.array([0, 1.0, 0.])
-        self.camera_front = np.array([0, 0, -1.0])
-        self.camera_fov = 45
-        self.camera_yaw = -90
-        self.camera_pitch = 0.0
-        
-        
-        self.xprev = 0
-        self.yprev = 0
-        
-        
-        
-        glfw.set_cursor_pos_callback(self.window, self.mouse_callback)
-        glfw.set_scroll_callback(self.window,self.scroll_callback)
-        
         self.light_color = np.array([1.0, 1.0, 1.0])
         self.object_color = np.array([1.0, 0.5, 0.3])
         self.light_pos = np.array([1.2, 1.0, 2.0])
         
+
+        
+        
+
+        self.camera = xglut.OrbitPerspectiveCamera(
+            45,self.width*1.0/self.height,1e-2,100.)
+        self.camera.position = np.array([0.,0.,3.])
+        self.camera.center = np.array([0.,0.,0.])
+        self.camera.update_projection_matrix()
+        self.camera.update_matrix()
+        
+        glfw.set_cursor_pos_callback(self.window, self.cursor_pos_callback)
+        glfw.set_scroll_callback(self.window,self.scroll_callback)
+        glfw.set_mouse_button_callback(self.window,self.mouse_button_callback)
+        
         self.view()
         
-        
     def scroll_callback(self,window,xoffset,yoffset):
-        self.camera_fov -= yoffset
-        self.camera_fov = np.clip(self.camera_fov, 1.0, 45)
+        self.camera.handle_scroll(window,xoffset,yoffset) 
     
+    def cursor_pos_callback(self,window,xpos,ypos):
+        self.camera.handle_cursor_pos(window,xpos,ypos)
+        
+    def mouse_button_callback(self,window,key,action,mods):
+        self.camera.handle_mouse_button(window,key,action,mods)
+        
     
-    def mouse_callback(self,window,xpos,ypos):
-        xoffset = xpos - self.xprev
-        yoffset = ypos - self.yprev
+    def resize(self,window,width,height):
+        super().resize(window,width,height)
+        self.camera.aspect = self.width * 1.0 / self.height
+        self.camera.update_projection_matrix()
         
-        
-        sensitivity = 0.1
-        xoffset *= sensitivity
-        yoffset *= sensitivity
 
-
-        if self.move_eye:
-            self.camera_yaw += xoffset
-            self.camera_pitch -= yoffset
-                
-        self.camera_pitch = np.clip(self.camera_pitch, -89,89)
-        
-        self.camera_front[0] = np.cos(glm.deg2rad(self.camera_yaw)) \
-            * np.cos(glm.deg2rad(self.camera_pitch))
-        self.camera_front[1] = np.sin(glm.deg2rad(self.camera_pitch))
-        self.camera_front[2] = np.sin(glm.deg2rad(self.camera_yaw)) \
-            * np.cos(glm.deg2rad(self.camera_pitch))
-        
-        
-        self.xprev = xpos
-        self.yprev = ypos
-        
         
 
     def handle_input(self):
-        current_time = glfw.get_time()
-        delta_time = current_time - self.last_time
-        self.last_time = current_time
-        speed = 2.5 * delta_time
-        
-        
+             
         if glfw.get_key(self.window, GLFW.GLFW_KEY_ESCAPE) == GLFW.GLFW_PRESS:
             glfw.set_window_should_close(self.window, True)
-        elif glfw.get_key(self.window, GLFW.GLFW_KEY_W) == GLFW.GLFW_PRESS:
-            self.camera_pos += speed * self.camera_front
-        elif glfw.get_key(self.window, GLFW.GLFW_KEY_S) == GLFW.GLFW_PRESS:
-            self.camera_pos -= speed * self.camera_front
-        elif glfw.get_key(self.window, GLFW.GLFW_KEY_A) == GLFW.GLFW_PRESS:
-            self.camera_pos -= glm.normalize(
-                np.cross(self.camera_front, self.camera_up)) * speed
-        elif glfw.get_key(self.window, GLFW.GLFW_KEY_D) == GLFW.GLFW_PRESS:
-            self.camera_pos += glm.normalize(
-                np.cross(self.camera_front, self.camera_up)) * speed
-        elif glfw.get_key(self.window, GLFW.GLFW_KEY_UP) == GLFW.GLFW_PRESS:
-            self.shininess += 1
-        elif glfw.get_key(self.window, GLFW.GLFW_KEY_DOWN) == GLFW.GLFW_PRESS:
-            self.shininess -= 1
-        self.shininess = np.clip(self.shininess, 1, 250)
         
-        self.move_eye = False
-        if glfw.get_mouse_button(self.window, GLFW.GLFW_MOUSE_BUTTON_LEFT)\
-            == GLFW.GLFW_PRESS:
-            self.move_eye = True
-            self.xprev,self.yprev = glfw.get_cursor_pos(self.window)
-            
-            
+        elif glfw.get_key(self.window, GLFW.GLFW_KEY_UP) == GLFW.GLFW_PRESS:
+            shininess = self.shininess + 1
+            self.shininess = min(shininess, 250.0)
+        elif glfw.get_key(self.window, GLFW.GLFW_KEY_DOWN) == GLFW.GLFW_PRESS:
+            shininess = self.shininess - 1
+            self.shininess = max(shininess, 1.0)
+        
+    
 
     def draw(self):
         # main drawing
@@ -174,29 +135,19 @@ class App(xglut.GLFWViewer):
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
 
 
-        projection_mat = glm.perspective(
-            self.camera_fov, self.width*1.0/self.height, 0.01, 100.0)
-        projection_mat = projection_mat.astype(np.float32)
-        
-        
-        view = glm.lookAt(
-            self.camera_pos,
-            self.camera_pos + self.camera_front,
-            self.camera_up)
-
         model_mat = np.eye(4)
         model_rot_mat = model_mat[:3,:3]
         model_normal_mat = model_rot_mat.T @ np.linalg.inv(model_rot_mat)
         
         self.cube_shader.use()
-        self.cube_shader.set_uniform("projection", projection_mat)
-        self.cube_shader.set_uniform("view", view)
+        self.cube_shader.set_uniform("projection", self.camera.projection)
+        self.cube_shader.set_uniform("view", self.camera.matrix)
         self.cube_shader.set_uniform("model", model_mat)
         self.cube_shader.set_uniform("modelNormal", model_normal_mat)
         self.cube_shader.set_uniform("objectColor", self.object_color)
         self.cube_shader.set_uniform("lightColor", self.light_color)
         self.cube_shader.set_uniform("lightPos",self.light_pos)
-        self.cube_shader.set_uniform("viewPos",self.camera_pos)
+        self.cube_shader.set_uniform("viewPos",self.camera.position)
         self.cube_shader.set_uniform("shininess",self.shininess)
         self.cube.draw()
         
@@ -205,11 +156,10 @@ class App(xglut.GLFWViewer):
         model_mat = np.eye(4)
         model_mat[:3,:3] *= 0.2
         model_mat[:3, -1] = self.light_pos
-        self.light_shader.set_uniform("projection", projection_mat)
-        self.light_shader.set_uniform("view", view)
+        self.light_shader.set_uniform("projection", self.camera.projection)
+        self.light_shader.set_uniform("view", self.camera.matrix)
         self.light_shader.set_uniform("model", model_mat)
         self.light_shader.set_uniform("lightColor", self.light_color)
-        # self.light_cube.draw()
         self.cube.draw()
         
 

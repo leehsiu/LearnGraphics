@@ -36,6 +36,7 @@ class Triangles:
         self.vao = None
         self.vbo = None
         self.vertices = vertices
+        self.upload()
 
     def upload(self):
 
@@ -86,8 +87,10 @@ class App(xglut.GLFWViewer):
         self.triangle = Triangles(vertices)
         self.triangle.upload()
 
-        self.texture0 = xglut.Texture('../../assets/textures/container.jpg')
-        self.texture1 = xglut.Texture('../../assets/textures/awesomeface.png')
+        self.texture0 = xglut.Texture.load(
+            '../../assets/textures/container.jpg')
+        self.texture1 = xglut.Texture.load(
+            '../../assets/textures/awesomeface.png')
 
         self.cube_positions = np.array([
             0.0, 0.0, 0.0,
@@ -103,13 +106,8 @@ class App(xglut.GLFWViewer):
 
         self.view()
         
-
-    def handle_input(self):
-        if glfw.get_key(self.window, GLFW.GLFW_KEY_ESCAPE) == GLFW.GLFW_PRESS:
-            glfw.set_window_should_close(self.window, True)
-
     def draw(self):
-            # main drawing
+        # main drawing
         gl.glClearColor(0.2, 0.3, 0.3, 1)
         
         # clear both color buffer and z-buffer
@@ -123,10 +121,10 @@ class App(xglut.GLFWViewer):
         gl.glActiveTexture(gl.GL_TEXTURE1)
         self.texture1.use()
 
-        projection_mat = glm.perspective(45, 640./480, 0.01, 100.0)
-        projection_mat = projection_mat.astype(np.float32)
-        self.shader.set_uniform("projection", projection_mat)
-        
+        projection_mat = glm.perspective(
+            45, self.width*1.0/self.height, 0.01, 100.0)
+    
+
         
         radius = 10.0
         camX = np.sin(glfw.get_time()) * radius
@@ -136,10 +134,11 @@ class App(xglut.GLFWViewer):
             np.array([0, 0, 0]),
             np.array([0, 1., 0.0])
         )
-        print(view)
+        vp_mat = projection_mat @ view
 
-        self.shader.set_uniform("view", view)
         
+        
+
         for i, r in enumerate(self.cube_positions):
             model_mat = np.eye(4)
             model_mat[:3, -1] = r
@@ -148,7 +147,10 @@ class App(xglut.GLFWViewer):
             model_mat[:3, :3] = glm.rotate(angle, axis)
             model_mat = model_mat.astype(np.float32)
             
-            self.shader.set_uniform("model", model_mat)
+            mvp_mat = vp_mat @ model_mat
+            
+            self.shader.set_uniform(
+                "ModelViewProjectionMatrix", mvp_mat)
             self.triangle.draw()
 
     def dispose(self):

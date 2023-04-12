@@ -53,5 +53,6 @@ class Shader:
                 gl.glUniformMatrix3fv(location, 1, gl.GL_TRUE, value)
             elif value.size == 3:
                 gl.glUniform3fv(location, 1, value)
-                
-                
+        elif isinstance(value, tuple) or isinstance(value, list):
+            if len(value) == 3:
+                gl.glUniform3f(location, value[0],value[1],value[2])
