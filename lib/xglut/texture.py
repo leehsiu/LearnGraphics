@@ -9,10 +9,8 @@ __all__ = [
 
 class Texture:
     def __init__(self, img):
-        self.texture = gl.glGenTextures(1)
-        # all upcoming GL_TEXTURE_2D operations now have effect on this texture
-        # object
-        gl.glBindTexture(gl.GL_TEXTURE_2D, self.texture)
+        self.tex_ID = gl.glGenTextures(1)
+        gl.glBindTexture(gl.GL_TEXTURE_2D, self.tex_ID)
         # set the texture wrapping parameters
 
         gl.glTexParameteri(
@@ -42,7 +40,7 @@ class Texture:
         return cls(img)
 
     def use(self):
-        gl.glBindTexture(gl.GL_TEXTURE_2D, self.texture)
+        gl.glBindTexture(gl.GL_TEXTURE_2D, self.tex_ID)
 
     def dispose(self):
-        gl.glDeleteTextures(1, (self.texture,))
+        gl.glDeleteTextures(1, self.tex_ID)

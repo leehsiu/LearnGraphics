@@ -15,10 +15,10 @@ class Shader:
         gl.glShaderSource(fragment, fragment_shader)
         gl.glCompileShader(fragment)
         
-        self.shader = gl.glCreateProgram()
-        gl.glAttachShader(self.shader, vertex)
-        gl.glAttachShader(self.shader, fragment)
-        gl.glLinkProgram(self.shader)
+        self.shader_ID = gl.glCreateProgram()
+        gl.glAttachShader(self.shader_ID, vertex)
+        gl.glAttachShader(self.shader_ID, fragment)
+        gl.glLinkProgram(self.shader_ID)
         
         gl.glDeleteShader(vertex)
         gl.glDeleteShader(fragment)
@@ -34,13 +34,13 @@ class Shader:
         return cls(vertex_src, fragment_src)
 
     def use(self):
-        gl.glUseProgram(self.shader)
+        gl.glUseProgram(self.shader_ID)
 
     def dispose(self):
-        gl.glDeleteProgram(self.shader)
+        gl.glDeleteProgram(self.shader_ID)
 
     def set_uniform(self, name, value):
-        location = gl.glGetUniformLocation(self.shader, name)
+        location = gl.glGetUniformLocation(self.shader_ID, name)
         # TODO: support more type
         if isinstance(value, int):
             gl.glUniform1i(location, value)

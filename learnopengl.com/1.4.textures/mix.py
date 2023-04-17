@@ -90,11 +90,13 @@ class App(xglut.GLFWViewer):
         indices = np.array(indices, np.uint32)
 
         self.triangle = Triangles(vertices, indices)
+        
 
         self.texture0 = xglut.Texture.load(
             '../../assets/textures/container.jpg')
         self.texture1 = xglut.Texture.load(
             '../../assets/textures/awesomeface.png')
+        gl.glBindTexture(gl.GL_TEXTURE_2D,0)
 
         self.mix_val = 0.2
 
@@ -117,6 +119,7 @@ class App(xglut.GLFWViewer):
         gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 
         self.shader.use()
+        
         self.shader.set_uniform("texture0", 0)
         self.shader.set_uniform("texture1", 1)
         self.shader.set_uniform("mixValue", self.mix_val)
@@ -124,6 +127,7 @@ class App(xglut.GLFWViewer):
         self.texture0.use()
         gl.glActiveTexture(gl.GL_TEXTURE1)
         self.texture1.use()
+        
         self.triangle.draw()
 
 

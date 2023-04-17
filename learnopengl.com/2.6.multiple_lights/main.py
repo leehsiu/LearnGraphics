@@ -62,21 +62,7 @@ class App(xglut.GLFWViewer):
         super().__init__(width, height, title)
 
 
-        self.cube_shaders = []
-        self.cube_shaders.append(
-            xglut.Shader.load('./cube.vs','./cube_direction_light.fs')
-        )
-        self.cube_shaders.append(
-            xglut.Shader.load('./cube.vs','./cube_point_light.fs')
-        )
-        self.cube_shaders.append(
-            xglut.Shader.load('./cube.vs','./cube_flash_light.fs')
-        )
-        self.cube_shaders.append(
-            xglut.Shader.load('./cube.vs','./cube_flash_light_smooth.fs')
-        )
-        
-        
+        self.cube_shader = xglut.Shader.load('./cube.vs','./cube.fs')
         self.light_shader = xglut.Shader.load('./light.vs', './light.fs')
         
         
@@ -101,6 +87,12 @@ class App(xglut.GLFWViewer):
             1.5,  2.0, -2.5,
             1.5,  0.2, -1.5,
             -1.3,  1.0, -1.5], np.float32).reshape(-1, 3)
+        
+        self.point_light_positions = np.array([
+            0.7,  0.2,  2.0,
+            2.3, -3.3, -4.0,
+            -4.0,  2.0, -12.0,
+            0.0,  0.0, -3.0]).reshape(-1,3)
         
         self.camera = xglut.OrbitPerspectiveCamera(
             45,self.width*1.0/self.height,1e-2,100.)
@@ -158,7 +150,7 @@ class App(xglut.GLFWViewer):
         
         
         
-        cube_shader = self.cube_shaders[self.light_ID]
+        cube_shader = self.cube_shader
         
         
         cube_shader.use()
@@ -171,29 +163,34 @@ class App(xglut.GLFWViewer):
         self.specular_map.use()
         
         cube_shader.set_uniform("viewPos",self.camera.position)
-        cube_shader.set_uniform("light.ambient",[0.1,0.1,0.1])
-        cube_shader.set_uniform("light.diffuse", [0.8,0.8,0.8])
-        cube_shader.set_uniform("light.specular",[1.0,1.0,1.0])
+        cube_shader.set_uniform("dirLight.direction",[-0.2, -1.0, -0.3])
+        cube_shader.set_uniform("dirLight.ambient",[0.05,0.05,0.05])
+        cube_shader.set_uniform("dirLight.diffuse", [0.4,0.4,0.4])
+        cube_shader.set_uniform("dirLight.specular",[0.5,0.5,0.5])
         
-        if self.light_ID == 0:
-            cube_shader.set_uniform("light.direction",[-0.2, -1.0, -0.3])
-        
-        elif self.light_ID == 1:
-            cube_shader.set_uniform("light.position",[1.2,1.0,2.0])
-            cube_shader.set_uniform("light.constant", 1.0)
-            cube_shader.set_uniform("light.linear", 0.09)
-            cube_shader.set_uniform("light.quadratic", 0.032)
-        elif self.light_ID == 2 or self.light_ID == 3:
-            cube_shader.set_uniform("light.position",self.camera.position)
-            camera_front = - self.camera.matrix[2, :3]
-            cube_shader.set_uniform("light.direction",camera_front)
-            cube_shader.set_uniform("light.constant", 1.0)
-            cube_shader.set_uniform("light.linear", 0.09)
-            cube_shader.set_uniform("light.quadratic", 0.032)
-            cube_shader.set_uniform("light.cutoff", np.cos(np.deg2rad(12.5)))
+        for i, position in enumerate(self.point_light_positions):
+            cube_shader.set_uniform(f"pointLights[{i}].position",position)
             cube_shader.set_uniform(
-                "light.outerCutoff", np.cos(np.deg2rad(17.5)))
-                                    
+                f"pointLights[{i}].ambient", [0.05, 0.05, 0.05])
+            cube_shader.set_uniform(
+                f"pointLights[{i}].diffuse", [0.8, 0.8, 0.8])
+            cube_shader.set_uniform(
+                f"pointLights[{i}].specular",[1.0, 1.0, 1.0])
+            cube_shader.set_uniform(f"pointLights[{i}].constant",1.0)
+            cube_shader.set_uniform(f"pointLights[{i}].linear",0.09)
+            cube_shader.set_uniform(f"pointLights[{i}].quadratic",0.032)
+        
+            
+        cube_shader.set_uniform("spotLight.position",self.camera.position)
+        camera_front = - self.camera.matrix[2, :3]
+        cube_shader.set_uniform("spotLight.direction",camera_front)
+        cube_shader.set_uniform("spotLight.constant", 1.0)
+        cube_shader.set_uniform("spotLight.linear", 0.09)
+        cube_shader.set_uniform("spotLight.quadratic", 0.032)
+        cube_shader.set_uniform("spotLight.cutOff", np.cos(np.deg2rad(12.5)))
+        cube_shader.set_uniform(
+            "spotLight.outerCutOff", np.cos(np.deg2rad(17.5)))
+                                
             
         
         
@@ -213,14 +210,11 @@ class App(xglut.GLFWViewer):
             
         
         
-        
-        
-        
-        if self.light_ID == 1:
-            self.light_shader.use()
+        self.light_shader.use()
+        for position in self.point_light_positions:
             model_mat = np.eye(4)
             model_mat[:3,:3] *= 0.2
-            model_mat[:3, -1] = np.array([1.2, 1.0, 2.0])
+            model_mat[:3, -1] = position
             mvp_mat = projection_mat @ view @ model_mat
             self.light_shader.set_uniform(
                 "ModelViewProjectionMatrix", mvp_mat)
